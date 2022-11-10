@@ -1,0 +1,269 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>AR age-taiyaki</title>
+<link rel='stylesheet' href='https://immersive-web.github.io/webxr-samples/css/common.css'>
+</head>
+<body>
+<header>
+<details open>
+  <summary>AR age-taiyaki</summary>
+  <p>
+    This sample demonstrates the use of anchors to place virtual objects in stable, real-world locations.
+    <br>
+    <a href=https://github.com/code4fukui/ar-sundome/>src on GitHub</a>
+    <a class="back" href="./">Back</a>
+  </p>
+</details>
+</header>
+<script type="module">
+// https://github.com/immersive-web/webxr-samples/
+import { WebXRButton } from 'https://immersive-web.github.io/webxr-samples/js/util/webxr-button.js';
+import { Scene } from 'https://immersive-web.github.io/webxr-samples/js/render/scenes/scene.js';
+import { Renderer, createWebGLContext } from 'https://immersive-web.github.io/webxr-samples/js/render/core/renderer.js';
+import { SkyboxNode } from 'https://immersive-web.github.io/webxr-samples/js/render/nodes/skybox.js';
+import { InlineViewerHelper } from 'https://immersive-web.github.io/webxr-samples/js/util/inline-viewer-helper.js';
+import { Gltf2Node } from 'https://immersive-web.github.io/webxr-samples/js/render/nodes/gltf2.js';
+import { QueryArgs } from 'https://immersive-web.github.io/webxr-samples/js/util/query-args.js';
+import { createCube } from "./createCube.js";
+
+// If requested, use the polyfill to provide support for mobile devices
+// and devices which only support WebVR.
+import WebXRPolyfill from 'https://immersive-web.github.io/webxr-samples/js/third-party/webxr-polyfill/build/webxr-polyfill.module.js';
+if (QueryArgs.getBool('usePolyfill', true)) {
+  new WebXRPolyfill();
+}
+
+const debug = true; // location.href.indexOf("github") == -1;
+
+// XR globals.
+let xrButton = null;
+let xrImmersiveRefSpace = null;
+let inlineViewerHelper = null;
+
+let isARAvailable = false;
+let isVRAvailable = false;
+let xrSessionString = 'immersive-vr';
+
+// WebGL scene globals.
+let gl = null;
+let renderer = null;
+const scene = new Scene();
+const particle = new Gltf2Node({ url: "./age-taiyaki.glb" });
+particle.positior = [0, 0, -1];
+particle.scale = [50, 20, 20];
+scene.addNode(particle);
+
+const MAX_ANCHORED_OBJECTS = 1000;
+let anchoredObjects = [];
+
+// Set with all anchors tracked in a previous frame.
+let all_previous_anchors = new Set();
+
+function initXR() {
+  xrButton = new WebXRButton({
+    onRequestSession: onRequestSession,
+    onEndSession: onEndSession,
+    textEnterXRTitle: isARAvailable ? "START AR" : "START VR",
+    textXRNotFoundTitle: isARAvailable ? "AR NOT FOUND" : "VR NOT FOUND",
+    textExitXRTitle: isARAvailable ? "EXIT  AR" : "EXIT  VR",
+  });
+  document.querySelector('header').appendChild(xrButton.domElement);
+
+  if (navigator.xr) {
+    // Checks to ensure that 'immersive-ar' or 'immersive-vr' mode is available,
+    // and only enables the button if so.
+    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+      isARAvailable = supported;
+      xrButton.enabled = supported;
+      if (!supported) {
+        navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+          isVRAvailable = supported;
+          xrButton.enabled = supported;
+        });
+      } else {
+        xrSessionString = 'immersive-ar';
+      }
+    });
+
+    navigator.xr.requestSession('inline').then(onSessionStarted);
+  }
+}
+
+function onRequestSession() {
+  // Requests an 'immersive-ar' or 'immersive-vr' session, depending on which is supported,
+  // and requests the 'anchors' module as a required feature.
+  return navigator.xr.requestSession(xrSessionString, { requiredFeatures: ['anchors'] })
+      .then((session) => {
+        xrButton.setSession(session);
+        session.isImmersive = true;
+        onSessionStarted(session);
+      });
+}
+
+function initGL() {
+  if (gl)
+    return;
+
+  gl = createWebGLContext({
+    xrCompatible: true
+  });
+  document.body.appendChild(gl.canvas);
+
+  const onResize = () => {
+    gl.canvas.width = gl.canvas.clientWidth * window.devicePixelRatio;
+    gl.canvas.height = gl.canvas.clientHeight * window.devicePixelRatio;
+  };
+  window.addEventListener('resize', onResize);
+  onResize();
+
+  renderer = new Renderer(gl);
+
+  scene.setRenderer(renderer);
+}
+
+function onSessionStarted(session) {
+  session.addEventListener('end', onSessionEnded);
+  session.addEventListener('select', onSelect);
+
+  if (session.isImmersive && isARAvailable) {
+    // When in 'immersive-ar' mode don't draw an opaque background because
+    // we want the real world to show through.
+    skybox.visible = false;
+  }
+
+  initGL();
+
+  // This and all future samples that visualize controllers will use this
+  // convenience method to listen for changes to the active XRInputSources
+  // and load the right meshes based on the profiles array.
+  scene.inputRenderer.useProfileControllerMeshes(session);
+
+  session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+
+  const refSpaceType = session.isImmersive ? 'local' : 'viewer';
+  session.requestReferenceSpace(refSpaceType).then((refSpace) => {
+    if (session.isImmersive) {
+      xrImmersiveRefSpace = refSpace;
+    } else {
+      inlineViewerHelper = new InlineViewerHelper(gl.canvas, refSpace);
+    }
+    session.requestAnimationFrame(onXRFrame);
+  });
+
+  // test
+  const node = createCube(renderer, [0, 0, -.5], 0.1);
+  scene.addNode(node);
+}
+
+function onEndSession(session) {
+  session.end();
+}
+
+function onSessionEnded(event) {
+  if (event.session.isImmersive) {
+    xrButton.setSession(null);
+    // Turn the background back on when we go back to the inlive view.
+    skybox.visible = true;
+  }
+}
+
+function addAnchoredObjectToScene(anchor) {
+  console.debug("Anchor created");
+
+  anchor.context = {};
+
+  //const node / new Gltf2Node({ url: URL_SUNFLOWER });
+  const node = createCube(renderer, [0, 0, -0.02], 0.1);
+  scene.addNode(node);
+  anchor.context.sceneObject = node;
+  node.anchor = anchor;
+  anchoredObjects.push(node);
+
+  // For performance reasons if we add too many objects start
+  // removing the oldest ones to keep the scene complexity
+  // from growing too much.
+  if (anchoredObjects.length > MAX_ANCHORED_OBJECTS) {
+    const objectToRemove = anchoredObjects.shift();
+    scene.removeNode(objectToRemove);
+    //objectToRemove.anchor.delete();
+  }
+}
+
+async function onSelect(event) {
+  const frame = event.frame;
+  const session = frame.session;
+  let anchorPose = new XRRigidTransform();
+  const inputSource = event.inputSource;
+
+  // If the user is on a screen based device, place the anchor 1 meter in front of them.
+  // Otherwise place the anchor at the location of the input device
+  if (inputSource.targetRayMode == 'screen') {
+    anchorPose = new XRRigidTransform(
+      { x: 0, y: 0, z: -1 },
+      { x: 0, y: 0, z: 0, w: 1 }
+    );
+  }
+
+  if (session.isImmersive) {
+    try {
+      // Create a free-floating anchor.
+      const rayspace = inputSource.targetRaySpace;
+      //const p2 = snap3D(p);
+      const anchor = await frame.createAnchor(anchorPose, rayspace);
+      addAnchoredObjectToScene(anchor);
+    } catch (error) {
+      console.error("Could not create anchor: " + error);
+    }
+  }
+}
+
+// Called every time a XRSession requests that a new frame be drawn.
+function onXRFrame(t, frame) {
+  const session = frame.session;
+  const xrRefSpace = session.isImmersive ? xrImmersiveRefSpace :inlineViewerHelper.referenceSpace;
+  const pose = frame.getViewerPose(xrRefSpace);
+
+  // Update the position of all the anchored objects based on the currently reported positions of their anchors
+  const tracked_anchors = frame.trackedAnchors;
+  if (tracked_anchors) {
+    all_previous_anchors.forEach(anchor => {
+      if (!tracked_anchors.has(anchor)){
+        scene.removeNode(anchor.sceneObject);
+      }
+    });
+
+    tracked_anchors.forEach(anchor => {
+      const anchorPose = frame.getPose(anchor.anchorSpace, xrRefSpace);
+      if (anchorPose) {
+        anchor.context.sceneObject.matrix = anchorPose.transform.matrix;
+        anchor.context.sceneObject.visible = true;
+      } else {
+        anchor.context.sceneObject.visible = false;
+      }
+    });
+
+    all_previous_anchors = tracked_anchors;
+  } else {
+    all_previous_anchors.forEach(anchor => {
+      scene.removeNode(anchor.sceneObject);
+    });
+
+    all_previous_anchors = new Set();
+  }
+
+  // In this sample and most samples after it we'll use a helper function
+  // to automatically add the right meshes for the session's input sources
+  // each frame. This also does simple hit detection to position the
+  // cursors correctly on the surface of selectable nodes.
+  scene.updateInputSources(frame, xrRefSpace);
+  scene.startFrame();
+  session.requestAnimationFrame(onXRFrame);
+  scene.drawXRFrame(frame, pose);
+  scene.endFrame();
+}
+
+// Start the XR application.
+initXR();
+
+</script>
+</body>
+</html>

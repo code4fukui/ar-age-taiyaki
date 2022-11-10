@@ -1,0 +1,60 @@
+<!DOCTYPE html><html><head>
+<title>AR age-taiyaki</title>
+<script src="https://code4fukui.github.io/aframe/dist/aframe-master.min.js"></script>
+</head>
+<body>
+<a-scene id="scene" background="color: #333" renderer="colorManagement: true">
+  <a-assets timeout="1000">
+    <a-asset-item id="taiyaki" src="./age-taiyaki.glb"></a-asset-item>
+  </a-assets>
+  <a-entity gltf-model="#taiyaki" position="0 0 -2" scale="20 20 20"></a-entity>
+
+  <a-entity id="cameraRig">
+    <a-entity id="camera" camera position="0 1.7 0" wasd-controls look-controls></a-entity>
+    <a-entity oculus-touch-controls="hand:left" teleport-controls="button:trigger; collisionEntities:.collidable; cameraRig:#cameraRig; teleportOrigin:#head;"></a-entity>
+    <a-entity oculus-touch-controls="hand:right" teleport-controls="button:trigger; collisionEntities:.collidable; cameraRig:#cameraRig; teleportOrigin:#head;"></a-entity>
+  </a-entity>
+</a-scene>
+
+<script type="module">
+
+const N_TAIYAKI = 3;
+
+const taiyakis = new Array(N_TAIYAKI);
+const scale = 20;
+const rnd = (n) => Math.random() * n - n / 2;
+for (let i = 0; i < taiyakis.length; i++) {
+  const t = document.createElement("a-entity");
+  t.setAttribute("gltf-model", "#taiyaki");
+  t.setAttribute("scale", `${scale} ${scale} ${scale}`);
+  const pos = { x: rnd(10), y: rnd(10), z: rnd(10) };
+  t.setAttribute("position", pos);
+  console.log(pos);
+  scene.appendChild(t);
+  taiyakis.push(t);
+}
+
+/*
+let lastt = performance.now();
+const anim = () => {
+  requestAnimationFrame(anim);
+  const t = performance.now();
+  const dt = t - lastt;
+  lastt = t;
+
+  for (const t of taiyakis) {
+    t.object3D.y += dt / 1000;
+    if (t.object3D.y < 0) {
+      t.object3D.y += 5;
+    }
+  }
+};
+anim();
+*/
+
+</script>
+
+
+
+</body>
+</html>

@@ -45,14 +45,13 @@ const anim = () => {
   lastt = t;
 
   for (const t of taiyakis) {
-    t.object3D.position.y -= dt / 1000;
+    t.object3D.position.y -= 0.01; // dt / 1000;
     if (t.object3D.position.y < 0) {
       t.object3D.position.y += 10;
     }
   }
 };
 anim();
-
 
 </script>
 

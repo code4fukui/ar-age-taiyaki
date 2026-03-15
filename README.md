@@ -4,8 +4,8 @@ https://code4fukui.github.io/ar-age-taiyaki/
 
 ## age-taiyaki
 
-by [カフェ＆ランチ アリス](https://alice-cafe.business.site/)
+by [Café & Lunch Alice](https://alice-cafe.business.site/)
 
-## blog
+## Blog
 
 https://fukuno.jig.jp/3759

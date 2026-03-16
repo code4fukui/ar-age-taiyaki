@@ -2,7 +2,7 @@
 
 > 日本語のREADMEはこちらです: [README.ja.md](README.ja.md)
 
-https://code4fukui.github.io/ar-age-taiyaki/
+> This is the English README for the Japanese open source project [ar-age-taiyaki](https://github.com/code4fukui/ar-age-taiyaki).
 
 ## age-taiyaki
 
@@ -23,4 +23,4 @@ This sample demonstrates the use of anchors to place virtual objects in stable, 
 On AR-enabled devices, the taiyaki will be displayed when the page is opened.
 
 ## License
-MIT License
+MIT License — see [LICENSE](LICENSE).

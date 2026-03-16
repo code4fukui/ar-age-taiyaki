@@ -1,6 +1,6 @@
 # AR age-taiyaki
 
-アリス カフェ & ランチの年齢つきたい焼きをAR空間に表示するサンプルです。
+アリス カフェ & ランチによる年齢付きたい焼きのAR表示サンプルです。
 
 ## デモ
 https://code4fukui.github.io/ar-age-taiyaki/
